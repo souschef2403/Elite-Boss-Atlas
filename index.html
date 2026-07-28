@@ -8,8 +8,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Boss Atlas" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="icon" href="assets/logo.svg" type="image/svg+xml" />
-  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
+  <link rel="icon" href="logo.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   <title>Elite Boss Atlas</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
@@ -17,7 +17,7 @@
 </head>
 <body>
 <header class="topbar" id="siteHeader">
-  <div class="brand"><img class="brand-logo" src="assets/logo.svg" alt="Elite Boss Atlas logo" /><div><p class="eyebrow" id="guildName">Community powered</p><h1 id="atlasName">Elite Boss Atlas</h1><p class="brand-tagline">Discover. Track. Conquer — together.</p></div></div>
+  <div class="brand"><img class="brand-logo" src="logo.svg" alt="Elite Boss Atlas logo" /><div><p class="eyebrow" id="guildName">Community powered</p><h1 id="atlasName">Elite Boss Atlas</h1><p class="brand-tagline">Discover. Track. Conquer — together.</p></div></div>
   <div class="auth-actions"><span id="userLabel" class="user-label">Public viewer</span><button id="authBtn" class="button primary">Community sign in</button><button id="profileBtn" class="button hidden">Profile</button><button id="moderationBtn" class="button gold hidden">🛡️ Review queue <span id="reviewBadge" class="count-badge hidden">0</span></button><button id="adminBtn" class="button admin-button hidden">👑 Admin</button><button id="signOutBtn" class="button hidden">Sign out</button></div>
 </header>
 <nav class="portal-nav" aria-label="Primary navigation">
@@ -37,7 +37,15 @@
     <p id="installHint" class="install-hint">Install the Atlas as an app and open it from your desktop, Start menu or home screen.</p>
     <div class="hero-trust"><span><b id="heroBossCount">0</b> bosses mapped</span><span><b id="heroRegionCount">0</b> regions explored</span><span><b id="heroReportCount">0</b> timer reports</span></div>
   </div>
-  <div class="hero-orbit" aria-hidden="true"><div class="orbit-map"><span class="orbit-pin pin-a">✦</span><span class="orbit-pin pin-b">✦</span><span class="orbit-pin pin-c">✦</span><span class="orbit-ring"></span></div></div>
+  <aside class="hero-showcase" aria-label="Install Elite Boss Atlas">
+    <div class="hero-map-preview"><span class="map-glow map-glow-a"></span><span class="map-glow map-glow-b"></span><span class="map-glow map-glow-c"></span></div>
+    <div class="install-card">
+      <img src="logo.svg" alt="" aria-hidden="true" />
+      <div><p class="eyebrow">Take the Atlas with you</p><h3>Install the desktop app</h3><p>Open it from your desktop, Start menu or home screen. It stays up to date automatically.</p></div>
+      <ul><li>Quick access</li><li>Desktop icon</li><li>App-style window</li></ul>
+      <button id="installShowcaseBtn" class="button gold">⬇ Install Elite Boss Atlas</button>
+    </div>
+  </aside>
 </section>
 <section id="featured" class="discovery-section">
   <div class="section-heading"><div><p class="eyebrow">Worth exploring</p><h2>Featured discoveries</h2><p>Freshly updated bosses and active community research.</p></div><button id="browseAllBtn" class="button">Browse every boss →</button></div>
@@ -54,7 +62,7 @@
   </aside>
   <section class="map-panel"><div class="map-help">Browse community discoveries. Moderators can unlock pins to add or reposition verified bosses.</div><div id="map"></div><div class="legend"><span><i class="dot elite"></i>Elite</span><span><i class="dot world"></i>World</span><span><i class="dot dungeon"></i>Dungeon</span><span><i class="dot event"></i>Event</span><span><i class="dot rare"></i>Rare</span></div></section>
 </main>
-<footer class="site-footer"><img src="assets/logo.svg" alt="" aria-hidden="true" /><div><strong>Elite Boss Atlas</strong><span>Created by <b>sous</b> · Built for the community.</span></div><button id="installFooterBtn" class="button gold">Download now</button></footer>
+<footer class="site-footer"><img src="logo.svg" alt="" aria-hidden="true" /><div><strong>Elite Boss Atlas</strong><span>Created by <b>sous</b> · Built for the community.</span></div><button id="installFooterBtn" class="button gold">Download now</button></footer>
 
 <dialog id="authDialog"><form method="dialog" class="dialog-card" id="authForm"><div class="dialog-head"><div><p class="eyebrow">Community access</p><h2>Sign in or create an account</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><p class="muted">Anyone can browse. Signed-in members can submit observations and corrections. Moderators approve changes.</p><label>Display name<input id="authDisplayName" type="text" minlength="2" maxlength="32" placeholder="Souschef" autocomplete="nickname" /></label><label>Email<input id="authEmail" type="email" required autocomplete="email" /></label><label>Password<input id="authPassword" type="password" required minlength="6" autocomplete="current-password" /></label><div id="authMessage" class="form-message"></div><div class="dialog-actions"><button type="button" id="signInSubmit" class="button primary">Sign in</button><button type="button" id="signUpSubmit" class="button">Create account</button></div></form></dialog>
 

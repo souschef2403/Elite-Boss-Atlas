@@ -53,3 +53,41 @@
 .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.settings-card{border:1px solid var(--border);border-radius:12px;padding:15px;background:#1d1822}.settings-card h3{margin:0 0 8px;color:var(--gold)}
 #adminBossSearch{margin-bottom:12px}
 @media(max-width:700px){.admin-summary,.settings-grid{grid-template-columns:1fr}.admin-user-row{grid-template-columns:1fr auto}.admin-user-row>div:last-child{grid-column:1/-1}.admin-card{width:calc(100vw - 18px)}}
+
+/* v3.0.1 responsive dialog sizing fix */
+dialog {
+  width: min(1100px, calc(100vw - 28px));
+  max-width: calc(100vw - 28px);
+  margin: auto;
+}
+.dialog-card,
+.dialog-card.wide,
+.dialog-card.detail,
+.dialog-card.compact,
+.leaderboard-card,
+.moderation-card,
+.review-detail-card,
+.admin-card {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+.dialog-head {
+  position: sticky;
+  top: -18px;
+  z-index: 5;
+  margin: -18px -18px 0;
+  padding: 18px 18px 10px;
+  background: var(--panel);
+}
+.dialog-head > div { min-width: 0; }
+.dialog-head h2 { overflow-wrap: anywhere; }
+.icon-button { flex: 0 0 auto; }
+.tabs,
+.admin-tabs { max-width: 100%; overflow-x: auto; padding-bottom: 3px; }
+@media(max-width:700px){
+  dialog { width: calc(100vw - 12px); max-width: calc(100vw - 12px); }
+  .dialog-card { padding: 14px; }
+  .dialog-head { top: -14px; margin: -14px -14px 0; padding: 14px 14px 10px; }
+}

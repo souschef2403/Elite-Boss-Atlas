@@ -18,7 +18,7 @@
     <div class="auth-actions">
       <span id="userLabel" class="user-label">Public viewer</span>
       <button id="authBtn" class="button primary">Guild sign in</button>
-      <button id="signOutBtn" class="button hidden">Sign out</button>
+      <button id="profileBtn" class="button hidden">Display name</button><button id="signOutBtn" class="button hidden">Sign out</button>
     </div>
   </header>
 
@@ -45,7 +45,7 @@
       <div class="toolbar">
         <button id="addBossBtn" class="button primary" disabled>Add boss</button>
         <button id="pinLockBtn" class="button" disabled>🔒 Pins locked</button>
-        <button id="exportBtn" class="button">Export</button>
+        <button id="leaderboardBtn" class="button gold">🏆 Leaderboard</button><button id="exportBtn" class="button">Export</button>
         <label class="button file-button">Import<input id="importInput" type="file" accept="application/json" hidden /></label>
       </div>
 
@@ -64,7 +64,7 @@
     <form method="dialog" class="dialog-card" id="authForm">
       <div class="dialog-head"><div><p class="eyebrow">Guild access</p><h2>Sign in or create an account</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div>
       <p class="muted">Public visitors can view the atlas. Signed-in guild members can add, edit, move and confirm bosses.</p>
-      <label>Email<input id="authEmail" type="email" required autocomplete="email" /></label>
+      <label>Guild display name<input id="authDisplayName" type="text" minlength="2" maxlength="32" placeholder="Souschef" autocomplete="nickname" /></label><label>Email<input id="authEmail" type="email" required autocomplete="email" /></label>
       <label>Password<input id="authPassword" type="password" required minlength="6" autocomplete="current-password" /></label>
       <div id="authMessage" class="form-message"></div>
       <div class="dialog-actions"><button type="button" id="signInSubmit" class="button primary">Sign in</button><button type="button" id="signUpSubmit" class="button">Create account</button></div>
@@ -103,7 +103,27 @@
     </form>
   </dialog>
 
-  <dialog id="detailDialog"><div class="dialog-card detail"><div class="dialog-head"><span></span><button id="closeDetailBtn" class="icon-button">×</button></div><div id="detailContent"></div><div class="dialog-actions"><button id="markSeenBtn" class="button">Seen now</button><span class="spacer"></span><button id="editBossBtn" class="button primary">Edit</button></div></div></dialog>
+  <dialog id="detailDialog"><div class="dialog-card detail"><div class="dialog-head"><span></span><button id="closeDetailBtn" class="icon-button">×</button></div><div id="detailContent"></div><div class="dialog-actions"><button id="markSeenBtn" class="button">Seen now</button><button id="confirmBossBtn" class="button gold">✓ Confirm boss</button><span class="spacer"></span><button id="editBossBtn" class="button primary">Edit</button></div></div></dialog>
+
+
+  <dialog id="profileDialog">
+    <form id="profileForm" class="dialog-card compact">
+      <div class="dialog-head"><div><p class="eyebrow">Guild identity</p><h2>Choose your display name</h2></div></div>
+      <p class="muted">This is the only name shown on the leaderboard. Your email address stays private.</p>
+      <label>Display name<input id="profileName" type="text" minlength="2" maxlength="32" required placeholder="Souschef" autocomplete="nickname" /></label>
+      <div id="profileMessage" class="form-message"></div>
+      <div class="dialog-actions"><span class="spacer"></span><button type="submit" class="button primary">Save name</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="leaderboardDialog">
+    <div class="dialog-card leaderboard-card">
+      <div class="dialog-head"><div><p class="eyebrow">Guild hall of fame</p><h2>Contributor leaderboard</h2></div><button id="closeLeaderboardBtn" class="icon-button">×</button></div>
+      <p class="muted">Boss added = 3 points · Boss confirmed = 1 point. Only display names are shown.</p>
+      <div class="leader-head"><span>Rank</span><span>Contributor</span><span>Added</span><span>Confirmed</span><span>Score</span></div>
+      <div id="leaderboardBody" class="leaderboard-body"></div>
+    </div>
+  </dialog>
 
   <datalist id="regionSuggestions"></datalist>
   <div id="toast" class="toast" aria-live="polite"></div>

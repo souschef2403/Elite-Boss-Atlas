@@ -5,7 +5,7 @@ const cfg = window.ATLAS_CONFIG || {};
 const configured = cfg.supabaseUrl && cfg.supabaseAnonKey && !cfg.supabaseUrl.includes('PASTE_') && !cfg.supabaseAnonKey.includes('PASTE_');
 const supabase = configured ? createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, { auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl:true } }) : null;
 const regions = ['Swamp of Silence','Black Anvil Forge','Forest of the Great Tree','Crimson Mansion','Herba Village','Bercant Manor',"Quietis's Demesne",'Fonos Basin',"Watcher's Post",'Ruins of Turayne','Purelight Tower','Purelight Hill','Shattered Temple','Blackhowl Plains','Carmine Forest','Urstella Fields','Kastleton','Golden Rye Pastures','Windhill Shores','The Raging Wilds','Grayclaw Forest','Canina Village','Akidu Valley','Manawastes','Moonlight Desert','Sanctuary Oasis','Sandworm Lair','Daybreak Shore','Vienta Village','Other'];
-let bosses=[], user=null, selected=null, pinsUnlocked=false, channel=null;
+let bosses=[], user=null, profile=null, selected=null, pinsUnlocked=false, channel=null, confirmationChannel=null;
 const markers = new Map();
 const $=s=>document.querySelector(s);
 const toast=msg=>{const el=$('#toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),1800)};
@@ -31,8 +31,42 @@ function filtered(){const q=$('#searchInput').value.trim().toLowerCase();return 
 function render(){const items=filtered();$('#bossList').innerHTML=items.length?items.map(b=>`<button class="boss-card" data-id="${b.id}"><div class="boss-card-top"><strong>${esc(b.name||'Unnamed boss')}</strong><span class="badge ${b.status==='Confirmed'?'confirmed':''}">${esc(b.status)}</span></div><small>${esc(b.code)} · ${esc(b.type)} · ${esc(b.region||'Unknown region')} ${b.grid?`· ${esc(b.grid)}`:''}</small><small>${esc(b.landmark||'No landmark yet')}</small></button>`).join(''):'<div class="empty-state">No bosses match these filters.</div>';$('#bossCount').textContent=bosses.length;$('#confirmedCount').textContent=bosses.filter(b=>b.status==='Confirmed').length;$('#regionCount').textContent=new Set(bosses.map(b=>b.region).filter(Boolean)).size;const used=[...new Set([...regions,...bosses.map(b=>b.region).filter(Boolean)])].sort();const current=$('#regionFilter').value;$('#regionFilter').innerHTML='<option value="">All regions</option>'+used.map(r=>`<option ${r===current?'selected':''}>${esc(r)}</option>`).join('');$('#regionSuggestions').innerHTML=used.map(r=>`<option value="${esc(r)}"></option>`).join('');renderMarkers()}
 async function loadBosses(){if(!supabase)return;$('#connectionStatus').textContent='Loading shared atlas…';const {data,error}=await supabase.from('bosses').select('*').order('code');if(error){$('#connectionStatus').textContent='Database error: '+error.message;return}bosses=(data||[]).map(dbToUi);$('#connectionStatus').textContent='Live shared atlas connected';render()}
 async function patchBoss(id,patch){const {error}=await supabase.from('bosses').update({...patch,updated_by:user.id}).eq('id',id);if(error)toast(error.message)}
-function setUser(next){user=next;$('#userLabel').textContent=user?user.email:'Public viewer';$('#authBtn').classList.toggle('hidden',!!user);$('#signOutBtn').classList.toggle('hidden',!user);$('#addBossBtn').disabled=!user;$('#pinLockBtn').disabled=!user;$('#importInput').disabled=!user;$('#editBossBtn').disabled=!user;$('#markSeenBtn').disabled=!user;if(!user){pinsUnlocked=false;$('#pinLockBtn').textContent='🔒 Pins locked'}renderMarkers()}
-if(supabase){const {data:{session}}=await supabase.auth.getSession();setUser(session?.user||null);supabase.auth.onAuthStateChange((_e,s)=>setUser(s?.user||null));await loadBosses();channel=supabase.channel('bosses-live').on('postgres_changes',{event:'*',schema:'public',table:'bosses'},()=>loadBosses()).subscribe();}else setUser(null);
+async function loadProfile(){
+  if(!supabase||!user){profile=null;return}
+  const {data,error}=await supabase.from('profiles').select('id,display_name').eq('id',user.id).maybeSingle();
+  if(error){toast('Profile error: '+error.message);return}
+  profile=data||null;
+  $('#userLabel').textContent=profile?.display_name||'Guild member';
+  if(!profile||profile.display_name==='Guild member'){
+    $('#profileName').value='';
+    $('#profileDialog').showModal();
+  }
+}
+async function setUser(next){
+  user=next;
+  profile=null;
+  $('#userLabel').textContent=user?'Guild member':'Public viewer';
+  $('#authBtn').classList.toggle('hidden',!!user);
+  $('#signOutBtn').classList.toggle('hidden',!user);
+  $('#profileBtn').classList.toggle('hidden',!user);
+  $('#addBossBtn').disabled=!user;
+  $('#pinLockBtn').disabled=!user;
+  $('#importInput').disabled=!user;
+  $('#editBossBtn').disabled=!user;
+  $('#markSeenBtn').disabled=!user;
+  $('#confirmBossBtn').disabled=!user;
+  if(!user){pinsUnlocked=false;$('#pinLockBtn').textContent='🔒 Pins locked'}
+  if(user) await loadProfile();
+  renderMarkers();
+}
+if(supabase){
+  const {data:{session}}=await supabase.auth.getSession();
+  await setUser(session?.user||null);
+  supabase.auth.onAuthStateChange(async(_e,s)=>await setUser(s?.user||null));
+  await loadBosses();
+  channel=supabase.channel('bosses-live').on('postgres_changes',{event:'*',schema:'public',table:'bosses'},()=>loadBosses()).subscribe();
+  confirmationChannel=supabase.channel('confirmations-live').on('postgres_changes',{event:'*',schema:'public',table:'boss_confirmations'},()=>{if($('#leaderboardDialog').open)loadLeaderboard()}).subscribe();
+}else setUser(null);
 
 map.on('click',e=>{if(!user||!pinsUnlocked)return;const pos=latLngToXy(e.latlng);openForm(null,pos)});
 $('#bossList').addEventListener('click',e=>{const c=e.target.closest('[data-id]');if(c)openDetail(c.dataset.id)});
@@ -40,8 +74,20 @@ $('#bossList').addEventListener('click',e=>{const c=e.target.closest('[data-id]'
 $('#clearFiltersBtn').addEventListener('click',()=>{$('#searchInput').value=$('#typeFilter').value=$('#statusFilter').value=$('#regionFilter').value='';render()});
 $('#authBtn').addEventListener('click',()=>$('#authDialog').showModal());
 $('#signOutBtn').addEventListener('click',()=>supabase.auth.signOut());
+$('#profileBtn').addEventListener('click',()=>{if(!user)return;$('#profileName').value=profile?.display_name||'';$('#profileMessage').textContent='';$('#profileDialog').showModal()});
+$('#profileForm').addEventListener('submit',async e=>{e.preventDefault();const name=$('#profileName').value.trim();if(name.length<2){$('#profileMessage').textContent='Use at least 2 characters.';return}$('#profileMessage').textContent='Saving…';const {data,error}=await supabase.from('profiles').update({display_name:name}).eq('id',user.id).select('id,display_name').single();if(error){$('#profileMessage').textContent=error.message;return}profile=data;$('#userLabel').textContent=name;$('#profileDialog').close();toast('Display name saved')});
+$('#leaderboardBtn').addEventListener('click',async()=>{$('#leaderboardDialog').showModal();await loadLeaderboard()});
+$('#closeLeaderboardBtn').addEventListener('click',()=>$('#leaderboardDialog').close());
+async function loadLeaderboard(){
+  $('#leaderboardBody').innerHTML='<div class="empty-state">Loading leaderboard…</div>';
+  const {data,error}=await supabase.from('contributor_leaderboard').select('*').order('score',{ascending:false}).order('bosses_added',{ascending:false});
+  if(error){$('#leaderboardBody').innerHTML=`<div class="form-message">${esc(error.message)}</div>`;return}
+  const rows=data||[];
+  $('#leaderboardBody').innerHTML=rows.length?rows.map((r,i)=>`<div class="leader-row ${i<3?'podium rank-'+(i+1):''}"><span class="rank">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</span><strong>${esc(r.display_name||'Guild member')}</strong><span>${r.bosses_added} added</span><span>${r.bosses_confirmed} confirmed</span><b>${r.score} pts</b></div>`).join(''):'<div class="empty-state">No contributions yet.</div>';
+}
+
 $('#signInSubmit').addEventListener('click',async()=>{const email=$('#authEmail').value.trim(),password=$('#authPassword').value;$('#authMessage').textContent='Signing in…';const {error}=await supabase.auth.signInWithPassword({email,password});$('#authMessage').textContent=error?error.message:'';if(!error)$('#authDialog').close()});
-$('#signUpSubmit').addEventListener('click',async()=>{const email=$('#authEmail').value.trim(),password=$('#authPassword').value;$('#authMessage').textContent='Creating account…';const {data,error}=await supabase.auth.signUp({email,password});$('#authMessage').textContent=error?error.message:(data.session?'Account created and signed in.':'Account created. Check your email if confirmation is enabled.');if(data.session)$('#authDialog').close()});
+$('#signUpSubmit').addEventListener('click',async()=>{const email=$('#authEmail').value.trim(),password=$('#authPassword').value,displayName=$('#authDisplayName').value.trim();if(displayName.length<2){$('#authMessage').textContent='Choose a display name with at least 2 characters.';return}$('#authMessage').textContent='Creating account…';const {data,error}=await supabase.auth.signUp({email,password,options:{data:{display_name:displayName}}});$('#authMessage').textContent=error?error.message:(data.session?'Account created and signed in.':'Account created. Check your email if confirmation is enabled.');if(data.session)$('#authDialog').close()});
 $('#addBossBtn').addEventListener('click',()=>openForm());
 $('#pinLockBtn').addEventListener('click',()=>{pinsUnlocked=!pinsUnlocked;$('#pinLockBtn').textContent=pinsUnlocked?'🔓 Pins unlocked':'🔒 Pins locked';renderMarkers();toast(pinsUnlocked?'Click the map to add, or drag pins to move':'Pins locked')});
 
@@ -57,6 +103,17 @@ $('#deleteBossBtn').addEventListener('click',async()=>{const id=$('#bossUuid').v
 function formatDate(v){return v?new Intl.DateTimeFormat('en-GB',{dateStyle:'medium',timeStyle:'short'}).format(new Date(v)):'Not recorded'}function duration(ms){const m=Math.max(0,Math.floor(ms/60000)),h=Math.floor(m/60);return h?`${h}h ${m%60}m`:`${m}m`}function timer(b){if(!b.lastSeen||(!b.respawnMin&&!b.respawnMax))return'No active timer';const s=new Date(b.lastSeen).getTime(),now=Date.now(),a=s+b.respawnMin*60000,z=s+(b.respawnMax||b.respawnMin)*60000;if(now<a)return`Earliest in ${duration(a-now)} · latest in ${duration(z-now)}`;if(now<=z)return`Spawn window open · closes in ${duration(z-now)}`;return`Window passed ${duration(now-z)} ago`}
 function openDetail(id){const b=bosses.find(x=>x.id===id);if(!b)return;selected=b;$('#detailContent').innerHTML=`<div class="detail-hero">${b.image?`<img src="${esc(b.image)}" alt="${esc(b.name)} screenshot">`:'<div class="detail-placeholder">No screenshot</div>'}<div><p class="eyebrow">${esc(b.code)} · ${esc(b.type)}</p><h2 class="detail-title">${esc(b.name)}</h2><div class="detail-meta"><span class="badge ${b.status==='Confirmed'?'confirmed':''}">${esc(b.status)}</span><span class="badge">${esc(b.difficulty||'No difficulty')}</span><span class="badge">${esc(b.party||'Party unknown')}</span></div><p>${esc(b.region||'Unknown region')} ${b.grid?`· Grid ${esc(b.grid)}`:''}</p><p>${esc(b.landmark||'No landmark recorded')}</p><p class="timer">${esc(timer(b))}</p></div></div><div class="detail-grid"><section class="detail-block"><h3>Last seen</h3><p>${esc(formatDate(b.lastSeen))}</p></section><section class="detail-block"><h3>Respawn</h3><p>${esc(b.respawnMin||'?')}–${esc(b.respawnMax||'?')} minutes</p></section><section class="detail-block"><h3>Drops / loot</h3><p>${esc(b.drops||'Not recorded')}</p></section><section class="detail-block"><h3>Weaknesses</h3><p>${esc(b.weaknesses||'Not recorded')}</p></section><section class="detail-block"><h3>Strategy</h3><p>${esc(b.strategy||'Not recorded')}</p></section><section class="detail-block"><h3>Notes</h3><p>${esc(b.notes||'No notes')}</p></section><section class="detail-block"><h3>Confirmation</h3><p>${esc(b.confirmedBy||'No confirmer recorded')}</p></section><section class="detail-block"><h3>Map position</h3><p>${b.x.toFixed(2)}%, ${b.y.toFixed(2)}%</p></section></div>`;$('#detailDialog').showModal()}
 $('#closeDetailBtn').addEventListener('click',()=>$('#detailDialog').close());$('#editBossBtn').addEventListener('click',()=>{if(!selected)return;$('#detailDialog').close();openForm(selected)});$('#markSeenBtn').addEventListener('click',async()=>{if(!selected||!user)return;const now=new Date().toISOString();await patchBoss(selected.id,{last_seen:now,updated_by:user.id});toast('Last seen set to now');await loadBosses();selected=bosses.find(x=>x.id===selected.id);openDetail(selected.id)});
+$('#confirmBossBtn').addEventListener('click',async()=>{
+  if(!selected||!user)return;
+  if(!profile||profile.display_name==='Guild member'){toast('Set your display name first');$('#profileBtn').click();return}
+  const {error}=await supabase.from('boss_confirmations').insert({boss_id:selected.id,user_id:user.id});
+  if(error&&error.code!=='23505'){toast(error.message);return}
+  await patchBoss(selected.id,{status:'Confirmed',confirmed_by:profile.display_name});
+  toast(error?.code==='23505'?'You already confirmed this boss':'Boss confirmed — +1 point');
+  await loadBosses();
+  selected=bosses.find(x=>x.id===selected.id);
+  openDetail(selected.id);
+});
 $('#exportBtn').addEventListener('click',()=>{const blob=new Blob([JSON.stringify({version:2,exportedAt:new Date().toISOString(),bosses},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`elite-boss-atlas-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href)});
 $('#importInput').addEventListener('change',async e=>{if(!user)return;try{const parsed=JSON.parse(await e.target.files[0].text()),incoming=Array.isArray(parsed)?parsed:parsed.bosses;if(!Array.isArray(incoming))throw new Error('Invalid atlas file');if(!confirm(`Import ${incoming.length} records into the shared atlas? Existing matching Boss IDs will be updated.`))return;for(const src of incoming){const record={code:src.code||src.id||nextCode(),name:src.name||'Unnamed boss',type:src.type||'Elite Boss',status:src.status||'Unconfirmed',region:src.region||'',grid:src.grid||'',landmark:src.landmark||'',level:String(src.level||''),difficulty:src.difficulty||'★★★☆☆',party:src.party||'',confirmed_by:src.confirmedBy||src.confirmed_by||'',respawn_min:Number(src.respawnMin??src.respawn_min)||0,respawn_max:Number(src.respawnMax??src.respawn_max)||0,last_seen:src.lastSeen||src.last_seen||null,drops:src.drops||'',weaknesses:src.weaknesses||'',strategy:src.strategy||'',notes:src.notes||'',x:Number(src.x)||50,y:Number(src.y)||50,image_url:src.image||src.image_url||null,updated_by:user.id};const {error}=await supabase.from('bosses').upsert({...record,created_by:user.id},{onConflict:'code'});if(error)throw error}toast('Shared atlas imported');await loadBosses()}catch(err){alert(err.message)}finally{e.target.value=''}});
 setInterval(()=>{if($('#detailDialog').open&&selected)openDetail(selected.id)},30000);

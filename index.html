@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#17131d" />
+  <title>Elite Boss Atlas</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow" id="guildName">Guild atlas</p>
+      <h1 id="atlasName">Elite Boss Atlas</h1>
+    </div>
+    <div class="auth-actions">
+      <span id="userLabel" class="user-label">Public viewer</span>
+      <button id="authBtn" class="button primary">Guild sign in</button>
+      <button id="signOutBtn" class="button hidden">Sign out</button>
+    </div>
+  </header>
+
+  <div id="setupWarning" class="setup-warning hidden">
+    <strong>Setup required.</strong> Add your Supabase URL and anon key to <code>config.js</code>, run <code>supabase-schema.sql</code>, then redeploy.
+  </div>
+
+  <main class="layout">
+    <aside class="sidebar">
+      <div class="stat-grid">
+        <div class="stat"><span id="bossCount">0</span><small>Bosses</small></div>
+        <div class="stat"><span id="confirmedCount">0</span><small>Confirmed</small></div>
+        <div class="stat"><span id="regionCount">0</span><small>Regions</small></div>
+      </div>
+
+      <div class="controls">
+        <input id="searchInput" type="search" placeholder="Search boss, region, loot…" />
+        <select id="typeFilter"><option value="">All types</option><option>Elite Boss</option><option>World Boss</option><option>Dungeon Elite</option><option>Event Boss</option><option>Rare Spawn</option></select>
+        <select id="statusFilter"><option value="">All statuses</option><option>Unconfirmed</option><option>Confirmed</option><option>Needs Recheck</option></select>
+        <select id="regionFilter"><option value="">All regions</option></select>
+        <button id="clearFiltersBtn" class="button">Clear filters</button>
+      </div>
+
+      <div class="toolbar">
+        <button id="addBossBtn" class="button primary" disabled>Add boss</button>
+        <button id="pinLockBtn" class="button" disabled>🔒 Pins locked</button>
+        <button id="exportBtn" class="button">Export</button>
+        <label class="button file-button">Import<input id="importInput" type="file" accept="application/json" hidden /></label>
+      </div>
+
+      <div id="connectionStatus" class="connection-status">Connecting…</div>
+      <div id="bossList" class="boss-list"></div>
+    </aside>
+
+    <section class="map-panel">
+      <div class="map-help">Guild editors: unlock pins, then drag a marker to its exact location. Click an empty location to create a boss.</div>
+      <div id="map"></div>
+      <div class="legend"><span><i class="dot elite"></i>Elite</span><span><i class="dot world"></i>World</span><span><i class="dot dungeon"></i>Dungeon</span><span><i class="dot event"></i>Event</span><span><i class="dot rare"></i>Rare</span></div>
+    </section>
+  </main>
+
+  <dialog id="authDialog">
+    <form method="dialog" class="dialog-card" id="authForm">
+      <div class="dialog-head"><div><p class="eyebrow">Guild access</p><h2>Sign in or create an account</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div>
+      <p class="muted">Public visitors can view the atlas. Signed-in guild members can add, edit, move and confirm bosses.</p>
+      <label>Email<input id="authEmail" type="email" required autocomplete="email" /></label>
+      <label>Password<input id="authPassword" type="password" required minlength="6" autocomplete="current-password" /></label>
+      <div id="authMessage" class="form-message"></div>
+      <div class="dialog-actions"><button type="button" id="signInSubmit" class="button primary">Sign in</button><button type="button" id="signUpSubmit" class="button">Create account</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="bossDialog">
+    <form id="bossForm" class="dialog-card wide">
+      <div class="dialog-head"><div><p class="eyebrow" id="bossIdLabel">New record</p><h2 id="dialogTitle">Add elite boss</h2></div><button id="closeDialogBtn" type="button" class="icon-button">×</button></div>
+      <input id="bossUuid" type="hidden" />
+      <input id="positionX" type="hidden" /><input id="positionY" type="hidden" />
+      <div class="form-grid">
+        <label>Boss ID<input id="bossCode" required placeholder="EB-001" /></label>
+        <label>Boss name<input id="bossName" required /></label>
+        <label>Type<select id="bossType"><option>Elite Boss</option><option>World Boss</option><option>Dungeon Elite</option><option>Event Boss</option><option>Rare Spawn</option></select></label>
+        <label>Status<select id="bossStatus"><option>Unconfirmed</option><option>Confirmed</option><option>Needs Recheck</option></select></label>
+        <label>Region<input id="bossRegion" list="regionSuggestions" /></label>
+        <label>Grid<input id="bossGrid" placeholder="D4" /></label>
+        <label class="span-2">Exact landmark<input id="bossLandmark" /></label>
+        <label>Level<input id="bossLevel" /></label>
+        <label>Difficulty<select id="bossDifficulty"><option>★☆☆☆☆</option><option>★★☆☆☆</option><option selected>★★★☆☆</option><option>★★★★☆</option><option>★★★★★</option></select></label>
+        <label>Recommended party<input id="bossParty" placeholder="3–5" /></label>
+        <label>Confirmed by<input id="bossConfirmedBy" /></label>
+        <label>Respawn minimum (minutes)<input id="bossRespawnMin" type="number" min="0" /></label>
+        <label>Respawn maximum (minutes)<input id="bossRespawnMax" type="number" min="0" /></label>
+        <label class="span-2">Last seen<input id="bossLastSeen" type="datetime-local" /></label>
+        <label class="span-2">Drops / loot<textarea id="bossDrops"></textarea></label>
+        <label class="span-2">Weaknesses<textarea id="bossWeaknesses"></textarea></label>
+        <label class="span-2">Strategy / safe pull<textarea id="bossStrategy"></textarea></label>
+        <label class="span-2">Notes<textarea id="bossNotes"></textarea></label>
+        <label class="span-2">Boss screenshot<input id="bossImage" type="file" accept="image/*" /></label>
+        <div id="imagePreviewWrap" class="image-preview hidden"><img id="imagePreview" alt="Boss preview" /><button id="removeImageBtn" type="button" class="button">Remove image</button></div>
+      </div>
+      <div id="saveMessage" class="form-message"></div>
+      <div class="dialog-actions"><button id="deleteBossBtn" type="button" class="button danger hidden">Delete</button><span class="spacer"></span><button id="cancelBtn" type="button" class="button">Cancel</button><button type="submit" class="button primary">Save boss</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="detailDialog"><div class="dialog-card detail"><div class="dialog-head"><span></span><button id="closeDetailBtn" class="icon-button">×</button></div><div id="detailContent"></div><div class="dialog-actions"><button id="markSeenBtn" class="button">Seen now</button><span class="spacer"></span><button id="editBossBtn" class="button primary">Edit</button></div></div></dialog>
+
+  <datalist id="regionSuggestions"></datalist>
+  <div id="toast" class="toast" aria-live="polite"></div>
+  <script src="config.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

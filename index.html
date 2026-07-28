@@ -10,12 +10,34 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-<header class="topbar">
+<header class="topbar" id="siteHeader">
   <div class="brand"><div class="brand-mark" aria-hidden="true">✦</div><div><p class="eyebrow" id="guildName">Community powered</p><h1 id="atlasName">Elite Boss Atlas</h1><p class="brand-tagline">Discover. Track. Conquer — together.</p></div></div>
   <div class="auth-actions"><span id="userLabel" class="user-label">Public viewer</span><button id="authBtn" class="button primary">Community sign in</button><button id="profileBtn" class="button hidden">Profile</button><button id="moderationBtn" class="button gold hidden">🛡️ Review queue <span id="reviewBadge" class="count-badge hidden">0</span></button><button id="adminBtn" class="button admin-button hidden">👑 Admin</button><button id="signOutBtn" class="button hidden">Sign out</button></div>
 </header>
+<nav class="portal-nav" aria-label="Primary navigation">
+  <button class="portal-nav-link active" data-scroll-target="welcome">Home</button>
+  <button class="portal-nav-link" data-scroll-target="atlas">Atlas</button>
+  <button class="portal-nav-link" data-scroll-target="featured">Featured bosses</button>
+  <button class="portal-nav-link" data-open-leaderboard>Community</button>
+</nav>
+<section id="welcome" class="welcome-hero" aria-labelledby="welcomeTitle">
+  <div class="fog fog-one" aria-hidden="true"></div><div class="fog fog-two" aria-hidden="true"></div>
+  <div class="hero-content">
+    <p class="eyebrow">A living community companion</p>
+    <h2 id="welcomeTitle">Every discovery makes the world easier to conquer.</h2>
+    <p>Explore verified boss locations, learn from community respawn reports and share what you find along the way.</p>
+    <div class="hero-actions"><button id="exploreAtlasBtn" class="button primary hero-button">Explore the atlas</button><button id="latestDiscoveriesBtn" class="button hero-button">Latest discoveries</button></div>
+    <div class="hero-trust"><span><b id="heroBossCount">0</b> bosses mapped</span><span><b id="heroRegionCount">0</b> regions explored</span><span><b id="heroReportCount">0</b> timer reports</span></div>
+  </div>
+  <div class="hero-orbit" aria-hidden="true"><div class="orbit-map"><span class="orbit-pin pin-a">✦</span><span class="orbit-pin pin-b">✦</span><span class="orbit-pin pin-c">✦</span><span class="orbit-ring"></span></div></div>
+</section>
+<section id="featured" class="discovery-section">
+  <div class="section-heading"><div><p class="eyebrow">Worth exploring</p><h2>Featured discoveries</h2><p>Freshly updated bosses and active community research.</p></div><button id="browseAllBtn" class="button">Browse every boss →</button></div>
+  <div id="featuredBosses" class="featured-grid"><div class="featured-skeleton"></div><div class="featured-skeleton"></div><div class="featured-skeleton"></div></div>
+  <div class="community-strip"><div><p class="eyebrow">The atlas is alive</p><h3>Recent community activity</h3></div><div id="communityActivity" class="activity-feed"><span>Connecting to community discoveries…</span></div></div>
+</section>
 <div id="setupWarning" class="setup-warning hidden"><strong>Setup required.</strong> Add Supabase settings to <code>config.js</code>, run <code>supabase-schema.sql</code>, then redeploy.</div>
-<main class="layout">
+<main class="layout" id="atlas">
   <aside class="sidebar">
     <div class="stat-grid"><div class="stat"><span id="bossCount">0</span><small>Bosses</small></div><div class="stat"><span id="confirmedCount">0</span><small>Confirmed</small></div><div class="stat"><span id="regionCount">0</span><small>Regions</small></div></div>
     <div class="controls"><input id="searchInput" type="search" placeholder="Search boss, region, loot…" /><select id="typeFilter"><option value="">All types</option><option>Elite Boss</option><option>World Boss</option><option>Dungeon Elite</option><option>Event Boss</option><option>Rare Spawn</option></select><select id="statusFilter"><option value="">All statuses</option><option>Unconfirmed</option><option>Confirmed</option><option>Needs Recheck</option></select><select id="regionFilter"><option value="">All regions</option></select><button id="clearFiltersBtn" class="button">Clear filters</button></div>

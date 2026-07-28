@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#17131d" />
+  <meta name="theme-color" content="#102b2d" />
   <title>Elite Boss Atlas</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" />
@@ -11,7 +11,7 @@
 </head>
 <body>
 <header class="topbar">
-  <div><p class="eyebrow" id="guildName">Community powered</p><h1 id="atlasName">Elite Boss Atlas</h1></div>
+  <div class="brand"><div class="brand-mark" aria-hidden="true">✦</div><div><p class="eyebrow" id="guildName">Community powered</p><h1 id="atlasName">Elite Boss Atlas</h1><p class="brand-tagline">Discover. Track. Conquer — together.</p></div></div>
   <div class="auth-actions"><span id="userLabel" class="user-label">Public viewer</span><button id="authBtn" class="button primary">Community sign in</button><button id="profileBtn" class="button hidden">Profile</button><button id="moderationBtn" class="button gold hidden">🛡️ Review queue <span id="reviewBadge" class="count-badge hidden">0</span></button><button id="adminBtn" class="button admin-button hidden">👑 Admin</button><button id="signOutBtn" class="button hidden">Sign out</button></div>
 </header>
 <div id="setupWarning" class="setup-warning hidden"><strong>Setup required.</strong> Add Supabase settings to <code>config.js</code>, run <code>supabase-schema.sql</code>, then redeploy.</div>

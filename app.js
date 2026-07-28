@@ -183,7 +183,7 @@ setInterval(()=>{if($('#detailDialog').open&&selected)openDetail(selected.id)},3
 
 // Installable desktop/mobile app (PWA)
 let deferredInstallPrompt=null;
-const installButtons=['#installAppBtn','#installNavBtn','#installFooterBtn'].map(sel=>$(sel)).filter(Boolean);
+const installButtons=['#installAppBtn','#installNavBtn','#installFooterBtn','#installShowcaseBtn'].map(sel=>$(sel)).filter(Boolean);
 const isStandalone=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
 function updateInstallButtons(){
   installButtons.forEach(btn=>{

@@ -211,5 +211,14 @@ async function installAtlas(){
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();deferredInstallPrompt=event;updateInstallButtons()});
 window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;installButtons.forEach(btn=>{btn.textContent='✓ App installed';btn.disabled=true});toast('Elite Boss Atlas is ready from your desktop or home screen.')});
 installButtons.forEach(btn=>btn.addEventListener('click',installAtlas));
-if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(err=>console.warn('Service worker registration failed',err)));
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      console.log('SUCCESS', reg);
+    } catch (e) {
+      console.error('FAILED', e);
+    }
+  });
+}
 updateInstallButtons();

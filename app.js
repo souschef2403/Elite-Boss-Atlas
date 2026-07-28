@@ -33,11 +33,11 @@ function filtered(){const q=$('#searchInput').value.trim().toLowerCase();return 
 function renderMarkers(){markers.forEach(m=>m.remove());markers.clear();for(const b of filtered()){const marker=L.marker(xyToLatLng(b.x,b.y),{icon:iconFor(b),draggable:Boolean(isModerator()&&pinsUnlocked),title:b.name||b.code}).addTo(map);marker.on('click',()=>openDetail(b.id));marker.on('dragend',async e=>{const pos=latLngToXy(e.target.getLatLng());await patchBoss(b.id,pos);toast(`${b.name||b.code} marker moved`)});markers.set(b.id,marker)}}
 function confidenceClass(v){return({'Unknown':'unknown','Early estimate':'early','Developing':'developing','Community verified':'verified'})[v]||'unknown'}
 function render(){const items=filtered();$('#bossList').innerHTML=items.length?items.map(b=>{const t=timerStats.get(b.id)||{};return`<button class="boss-card" data-id="${b.id}"><div class="boss-card-top"><strong>${esc(b.name||'Unnamed boss')}</strong><span class="badge ${b.status==='Confirmed'?'confirmed':''}">${esc(b.status)}</span></div><small>${esc(b.code)} · ${esc(b.type)} · ${esc(b.region||'Unknown region')} ${b.grid?`· ${esc(b.grid)}`:''}</small><small>${esc(b.landmark||'No landmark yet')}</small><small class="timer-confidence ${confidenceClass(t.timer_confidence)}">${esc(t.timer_confidence||'Unknown')} · ${t.approved_observations||0} timer reports</small></button>`}).join(''):'<div class="empty-state">No bosses match these filters.</div>';$('#bossCount').textContent=bosses.length;$('#confirmedCount').textContent=bosses.filter(b=>b.status==='Confirmed').length;$('#regionCount').textContent=new Set(bosses.map(b=>b.region).filter(Boolean)).size;const used=[...new Set([...regions,...bosses.map(b=>b.region).filter(Boolean)])].sort();const current=$('#regionFilter').value;$('#regionFilter').innerHTML='<option value="">All regions</option>'+used.map(r=>`<option ${r===current?'selected':''}>${esc(r)}</option>`).join('');$('#regionSuggestions').innerHTML=used.map(r=>`<option value="${esc(r)}"></option>`).join('');$('#submissionBoss').innerHTML='<option value="">Not linked / new boss</option>'+bosses.map(b=>`<option value="${b.id}">${esc(b.code)} · ${esc(b.name)}</option>`).join('');renderMarkers()}
-async function loadBosses(){if(!supabase)return;$('#connectionStatus').textContent='Loading community atlas…';const [{data,error},{data:stats,error:statsError}]=await Promise.all([supabase.from('bosses').select('*').order('code'),supabase.from('boss_timer_stats').select('*')]);if(error){$('#connectionStatus').textContent='Database error: '+error.message;return}if(statsError)toast('Timer stats unavailable: '+statsError.message);bosses=(data||[]).map(dbToUi);timerStats=new Map((stats||[]).map(x=>[x.boss_id,x]));$('#connectionStatus').textContent='Live community atlas connected';render()}
+async function loadBosses(){if(!supabase)return;$('#connectionStatus').textContent='Loading community atlas…';const {data,error}=await supabase.from('bosses').select('*').order('code');if(error){$('#connectionStatus').textContent='Database error: '+error.message;return}bosses=(data||[]).map(dbToUi);const {data:stats,error:statsError}=await supabase.from('boss_timer_stats').select('*');timerStats=statsError?new Map():new Map((stats||[]).map(x=>[x.boss_id,x]));if(statsError)console.warn('Timer stats unavailable:',statsError.message);$('#connectionStatus').textContent='Live community atlas connected';render()}
 async function patchBoss(id,patch){if(!isModerator())return toast('Moderator access required');const{error}=await supabase.from('bosses').update({...patch,updated_by:user.id}).eq('id',id);if(error)toast(error.message)}
 
 async function loadProfile(){if(!supabase||!user){profile=null;return}const{data,error}=await supabase.from('profiles').select('id,display_name,is_moderator,is_owner').eq('id',user.id).maybeSingle();if(error){toast('Profile error: '+error.message);return}profile=data||null;$('#userLabel').textContent=profile?.display_name||'Community member';if(!profile||profile.display_name==='Community member'){$('#profileName').value='';$('#profileDialog').showModal()}}
-async function setUser(next){user=next;profile=null;$('#userLabel').textContent=user?'Community member':'Public viewer';$('#authBtn').classList.toggle('hidden',!!user);$('#signOutBtn').classList.toggle('hidden',!user);$('#profileBtn').classList.toggle('hidden',!user);$('#submitUpdateBtn').disabled=!user;$('#observationBtn').disabled=!user;$('#confirmBossBtn').disabled=!user;if(user)await loadProfile();const mod=isModerator();$('#addBossBtn').disabled=!mod;$('#pinLockBtn').disabled=!mod;$('#editBossBtn').disabled=!mod;$('#moderationBtn').classList.toggle('hidden',!mod);$('#adminBtn')?.classList.toggle('hidden',!isOwner());$$('.moderator-only').forEach(el=>el.classList.toggle('hidden',!mod));if(!mod){pinsUnlocked=false;$('#pinLockBtn').textContent='🔒 Pins locked'}else await loadPendingCount();renderMarkers()}
+async function setUser(next){user=next;profile=null;$('#userLabel').textContent=user?'Community member':'Public viewer';$('#authBtn').classList.toggle('hidden',!!user);$('#signOutBtn').classList.toggle('hidden',!user);$('#profileBtn').classList.toggle('hidden',!user);$('#submitUpdateBtn').disabled=!user;$('#observationBtn').disabled=!user;$('#confirmBossBtn').disabled=!user;if(user)await loadProfile();const mod=isModerator();$('#addBossBtn').disabled=!mod;$('#pinLockBtn').disabled=!mod;$('#editBossBtn').disabled=!mod;$('#moderationBtn').classList.toggle('hidden',!mod);$('#adminBtn').classList.toggle('hidden',!isOwner());$$('.moderator-only').forEach(el=>el.classList.toggle('hidden',!mod));if(!mod){pinsUnlocked=false;$('#pinLockBtn').textContent='🔒 Pins locked'}else await loadPendingCount();renderMarkers()}
 if(supabase){const{data:{session}}=await supabase.auth.getSession();await setUser(session?.user||null);supabase.auth.onAuthStateChange(async(_e,s)=>await setUser(s?.user||null));await loadBosses();supabase.channel('atlas-v2-live').on('postgres_changes',{event:'*',schema:'public',table:'bosses'},loadBosses).on('postgres_changes',{event:'*',schema:'public',table:'spawn_observations'},async()=>{await loadBosses();await loadPendingCount()}).on('postgres_changes',{event:'*',schema:'public',table:'community_submissions'},loadPendingCount).subscribe()}else setUser(null);
 
 map.on('click',e=>{if(!isModerator()||!pinsUnlocked)return;openForm(null,latLngToXy(e.latlng))});
@@ -74,22 +74,7 @@ $('#submitUpdateBtn').addEventListener('click',()=>{if(!user)return;$('#submissi
 $('#submissionForm').addEventListener('submit',async e=>{e.preventDefault();$('#submissionMessage').textContent='Submitting…';const{error}=await supabase.from('community_submissions').insert({submission_type:$('#submissionType').value,boss_id:$('#submissionBoss').value||null,boss_name:$('#submissionBossName').value.trim(),region:$('#submissionRegion').value.trim(),grid:$('#submissionGrid').value.trim().toUpperCase(),details:$('#submissionDetails').value.trim(),evidence_url:$('#submissionEvidence').value.trim(),submitted_by:user.id});if(error)return $('#submissionMessage').textContent=error.message;$('#submissionDialog').close();e.target.reset();toast('Update submitted for moderator review')});
 
 async function loadPendingCount(){if(!isModerator())return;const [{count:observations,error:oError},{count:submissions,error:sError}]=await Promise.all([supabase.from('spawn_observations').select('id',{count:'exact',head:true}).in('review_status',['pending','needs_evidence']),supabase.from('community_submissions').select('id',{count:'exact',head:true}).in('review_status',['pending','needs_evidence'])]);if(oError||sError)return;const total=(observations||0)+(submissions||0),badge=$('#reviewBadge');badge.textContent=total;badge.classList.toggle('hidden',total===0);$('#moderationBtn').title=total?`${total} submissions waiting for review`:'No submissions waiting'}
-$('#moderationBtn').addEventListener('click',async()=>{
-  if(!isModerator())return toast('Moderator access required');
-  reviewTab='observations';
-  $$('[data-review-tab]').forEach(btn=>btn.classList.toggle('active',btn.dataset.reviewTab===reviewTab));
-  $('#moderationDialog').showModal();
-  await loadReviewQueue();
-});
-$('#closeModerationBtn').addEventListener('click',()=>$('#moderationDialog').close());
-$('#moderationDialog').addEventListener('click',async e=>{
-  const btn=e.target.closest('[data-review-tab]');
-  if(!btn)return;
-  e.preventDefault();
-  reviewTab=btn.dataset.reviewTab;
-  $$('[data-review-tab]').forEach(x=>x.classList.toggle('active',x===btn));
-  await loadReviewQueue();
-});
+$('#moderationBtn').addEventListener('click',async()=>{$('#moderationDialog').showModal();await loadReviewQueue()});$('#closeModerationBtn').addEventListener('click',()=>$('#moderationDialog').close());$$('[data-review-tab]').forEach(btn=>btn.addEventListener('click',async()=>{reviewTab=btn.dataset.reviewTab;$$('[data-review-tab]').forEach(x=>x.classList.toggle('active',x===btn));await loadReviewQueue()}));
 function reviewAge(v){const hours=Math.max(0,Math.floor((Date.now()-new Date(v).getTime())/3600000));return hours<1?'just now':hours<24?`${hours}h ago`:`${Math.floor(hours/24)}d ago`}
 async function loadReviewQueue(){if(!isModerator())return;$('#moderationBody').innerHTML='<div class="empty-state">Loading review queue…</div>';const table=reviewTab==='observations'?'spawn_observations':'community_submissions',select=reviewTab==='observations'?'*,bosses(code,name)':'*';const{data,error}=await supabase.from(table).select(select).in('review_status',['pending','needs_evidence']).order('created_at');if(error)return $('#moderationBody').innerHTML=`<div class="form-message">${esc(error.message)}</div>`;const rows=data||[],important=rows.filter(r=>reviewTab==='submissions'&&['new_boss','location_update'].includes(r.submission_type)).length;$('#moderationBody').innerHTML=`<div class="review-summary"><span class="badge">${rows.length} waiting</span>${important?`<span class="priority-chip">${important} important</span>`:''}<span class="muted">Oldest submissions are shown first.</span></div>`+(rows.length?rows.map(r=>{const isImportant=reviewTab==='submissions'&&['new_boss','location_update'].includes(r.submission_type);const title=reviewTab==='observations'?`${r.bosses?.code||''} · ${r.bosses?.name||'Boss'}`:`${r.submission_type.replaceAll('_',' ')} · ${r.boss_name||'Linked boss'}`;const summary=reviewTab==='observations'?`${formatDate(r.defeated_at)} → ${formatDate(r.respawned_at)} · ${r.elapsed_minutes} min`:`${r.region||'No region'} ${r.grid||''}`;return`<article class="review-card ${isImportant?'important':''}"><div><div class="review-card-head">${isImportant?'<span class="priority-chip">Important</span>':''}<strong>${esc(title)}</strong></div><p>${esc(summary)}</p><p>${esc(r.notes||r.details||'No details')}</p><p class="review-meta">Submitted ${esc(reviewAge(r.created_at))} · Status: ${esc(r.review_status.replace('_',' '))}</p></div><div class="review-actions"><button class="button primary" data-open-review="${r.id}" data-review-kind="${reviewTab}">Review</button></div></article>`}).join(''):'<div class="empty-state">Nothing is waiting for review.</div>')}
 $('#moderationBody').addEventListener('click',async e=>{const button=e.target.closest('[data-open-review]');if(!button)return;await openReviewItem(button.dataset.reviewKind,button.dataset.openReview)});
@@ -103,9 +88,64 @@ $('#leaderboardBtn').addEventListener('click',async()=>{$('#leaderboardDialog').
 
 $('#exportBtn').addEventListener('click',()=>{const blob=new Blob([JSON.stringify({version:3,exportedAt:new Date().toISOString(),bosses},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`elite-boss-atlas-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(a.href)});
 $('#importInput').addEventListener('change',async e=>{if(!isModerator())return;try{const parsed=JSON.parse(await e.target.files[0].text()),incoming=Array.isArray(parsed)?parsed:parsed.bosses;if(!Array.isArray(incoming))throw new Error('Invalid atlas file');if(!confirm(`Import ${incoming.length} records?`))return;for(const src of incoming){const record={code:src.code||src.id||nextCode(),name:src.name||'Unnamed boss',type:src.type||'Elite Boss',status:src.status||'Unconfirmed',region:src.region||'',grid:src.grid||'',landmark:src.landmark||'',level:String(src.level||''),difficulty:src.difficulty||'★★★☆☆',party:src.party||'',confirmed_by:src.confirmedBy||src.confirmed_by||'',respawn_min:Number(src.respawnMin??src.respawn_min)||0,respawn_max:Number(src.respawnMax??src.respawn_max)||0,last_seen:src.lastSeen||src.last_seen||null,drops:src.drops||'',weaknesses:src.weaknesses||'',strategy:src.strategy||'',notes:src.notes||'',x:Number(src.x)||50,y:Number(src.y)||50,image_url:src.image||src.image_url||null,updated_by:user.id};const{error}=await supabase.from('bosses').upsert({...record,created_by:user.id},{onConflict:'code'});if(error)throw error}toast('Atlas imported');await loadBosses()}catch(err){alert(err.message)}finally{e.target.value=''}});
-$('#adminBtn')?.addEventListener('click',async()=>{if(!isOwner())return toast('Owner access required');const dialog=$('#adminDialog');if(!dialog)return toast('Admin dashboard is not installed in index.html');dialog.showModal();await loadAdminDashboard()});
-$('#closeAdminBtn')?.addEventListener('click',()=>$('#adminDialog')?.close());
-$('#adminRefreshBtn')?.addEventListener('click',loadAdminDashboard);
-async function loadAdminDashboard(){if(!isOwner()||!$('#adminUsers'))return;$('#adminUsers').innerHTML='<div class="empty-state">Loading community users…</div>';const{data,error}=await supabase.from('profiles').select('id,display_name,is_moderator,is_owner,created_at').order('created_at');if(error){$('#adminUsers').innerHTML=`<div class="form-message">${esc(error.message)}</div>`;return}const users=data||[],moderators=users.filter(x=>x.is_moderator).length;$('#adminUserCount').textContent=users.length;$('#adminModeratorCount').textContent=moderators;$('#adminMemberCount').textContent=Math.max(0,users.length-moderators);$('#adminUsers').innerHTML=users.length?users.map(p=>{const role=p.is_owner?'Owner':p.is_moderator?'Moderator':'Member',own=p.id===user.id,action=p.is_owner?'<span class="owner-lock">Protected owner</span>':`<button class="button ${p.is_moderator?'danger':'primary'}" data-role-user="${p.id}" data-role-enable="${p.is_moderator?'false':'true'}">${p.is_moderator?'Demote':'Promote'}</button>`;return`<article class="admin-user-row"><div><strong>${esc(p.display_name||'Community member')}</strong>${own?' <span class="badge">You</span>':''}<small>Joined ${esc(formatDate(p.created_at))}</small></div><span class="role-chip role-${role.toLowerCase()}">${role}</span><div>${action}</div></article>`}).join(''):'<div class="empty-state">No profiles found.</div>'}
-$('#adminUsers')?.addEventListener('click',async e=>{const btn=e.target.closest('[data-role-user]');if(!btn||!isOwner())return;const enabled=btn.dataset.roleEnable==='true',verb=enabled?'promote this member to moderator':'remove moderator access from this member';if(!confirm(`Are you sure you want to ${verb}?`))return;btn.disabled=true;const{error}=await supabase.rpc('set_user_moderator',{target_user_id:btn.dataset.roleUser,moderator_enabled:enabled});if(error){toast(error.message);btn.disabled=false;return}toast(enabled?'Moderator promoted':'Moderator demoted');await loadAdminDashboard()});
+let adminTab='users';
+function setAdminTab(tab){
+  adminTab=tab;
+  $$('[data-admin-tab]').forEach(b=>b.classList.toggle('active',b.dataset.adminTab===tab));
+  ['users','submissions','bosses','settings'].forEach(name=>{
+    const el=$(`#admin${name[0].toUpperCase()+name.slice(1)}Panel`);
+    if(el)el.classList.toggle('hidden',name!==tab);
+  });
+}
+$('#adminBtn').addEventListener('click',async()=>{
+  if(!isOwner())return toast('Owner access required');
+  setAdminTab('users');
+  $('#adminDialog').showModal();
+  await loadAdminDashboard();
+});
+$('#closeAdminBtn').addEventListener('click',()=>$('#adminDialog').close());
+$('#adminRefreshBtn').addEventListener('click',loadAdminDashboard);
+$('#adminDialog').addEventListener('click',async e=>{
+  const btn=e.target.closest('[data-admin-tab]');
+  if(!btn)return;
+  setAdminTab(btn.dataset.adminTab);
+  await loadAdminDashboard();
+});
+async function loadAdminDashboard(){
+  if(!isOwner())return;
+  if(adminTab==='users')return loadAdminUsers();
+  if(adminTab==='submissions')return loadAdminSubmissions();
+  if(adminTab==='bosses')return loadAdminBosses();
+  return loadAdminSettings();
+}
+async function loadAdminUsers(){
+  $('#adminUsers').innerHTML='<div class="empty-state">Loading community users…</div>';
+  const{data,error}=await supabase.from('profiles').select('id,display_name,is_moderator,is_owner,created_at').order('created_at');
+  if(error){$('#adminUsers').innerHTML=`<div class="form-message">${esc(error.message)}</div>`;return}
+  const users=data||[],moderators=users.filter(x=>x.is_moderator).length;
+  $('#adminUserCount').textContent=users.length;$('#adminModeratorCount').textContent=moderators;$('#adminMemberCount').textContent=Math.max(0,users.length-moderators);
+  $('#adminUsers').innerHTML=users.length?users.map(p=>{const role=p.is_owner?'Owner':p.is_moderator?'Moderator':'Member',own=p.id===user.id,action=p.is_owner?'<span class="owner-lock">Protected owner</span>':`<button class="button ${p.is_moderator?'danger':'primary'}" data-role-user="${p.id}" data-role-enable="${p.is_moderator?'false':'true'}">${p.is_moderator?'Demote':'Promote'}</button>`;return`<article class="admin-user-row"><div><strong>${esc(p.display_name||'Community member')}</strong>${own?' <span class="badge">You</span>':''}<small>Joined ${esc(formatDate(p.created_at))}</small></div><span class="role-chip role-${role.toLowerCase()}">${role}</span><div>${action}</div></article>`}).join(''):'<div class="empty-state">No profiles found.</div>';
+}
+$('#adminUsers').addEventListener('click',async e=>{const btn=e.target.closest('[data-role-user]');if(!btn||!isOwner())return;const enabled=btn.dataset.roleEnable==='true',verb=enabled?'promote this member to moderator':'remove moderator access from this member';if(!confirm(`Are you sure you want to ${verb}?`))return;btn.disabled=true;const{error}=await supabase.rpc('set_user_moderator',{target_user_id:btn.dataset.roleUser,moderator_enabled:enabled});if(error){toast(error.message);btn.disabled=false;return}toast(enabled?'Moderator promoted':'Moderator demoted');await loadAdminUsers()});
+async function loadAdminSubmissions(){
+  $('#adminSubmissions').innerHTML='<div class="empty-state">Loading submission history…</div>';
+  const[{data:obs,error:oError},{data:subs,error:sError}]=await Promise.all([
+    supabase.from('spawn_observations').select('id,review_status,created_at,elapsed_minutes,bosses(code,name)').order('created_at',{ascending:false}).limit(100),
+    supabase.from('community_submissions').select('id,submission_type,boss_name,review_status,created_at').order('created_at',{ascending:false}).limit(100)
+  ]);
+  if(oError||sError){$('#adminSubmissions').innerHTML=`<div class="form-message">${esc(oError?.message||sError?.message)}</div>`;return}
+  const rows=[...(obs||[]).map(x=>({...x,kind:'Timer',title:`${x.bosses?.code||''} ${x.bosses?.name||'Boss'}`,detail:`${x.elapsed_minutes||'?'} min`})),...(subs||[]).map(x=>({...x,kind:'Update',title:x.boss_name||x.submission_type.replaceAll('_',' '),detail:x.submission_type.replaceAll('_',' ')}))].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  $('#adminSubmissions').innerHTML=rows.length?rows.map(r=>`<article class="admin-history-row"><div><strong>${esc(r.title)}</strong><small>${esc(r.kind)} · ${esc(r.detail)} · ${esc(formatDate(r.created_at))}</small></div><span class="status-chip status-${esc(r.review_status)}">${esc(r.review_status.replaceAll('_',' '))}</span></article>`).join(''):'<div class="empty-state">No submissions yet.</div>';
+}
+async function loadAdminBosses(){
+  const q=($('#adminBossSearch').value||'').trim().toLowerCase();
+  const rows=bosses.filter(b=>!q||[b.code,b.name,b.region,b.grid].join(' ').toLowerCase().includes(q));
+  $('#adminBosses').innerHTML=rows.length?rows.map(b=>`<article class="admin-boss-row"><div><strong>${esc(b.code)} · ${esc(b.name)}</strong><small>${esc(b.region||'Unknown region')} ${b.grid?`· ${esc(b.grid)}`:''} · ${esc(b.status)}</small></div><button class="button" data-admin-edit-boss="${b.id}">Edit</button></article>`).join(''):'<div class="empty-state">No bosses match.</div>';
+}
+$('#adminBossSearch').addEventListener('input',loadAdminBosses);
+$('#adminBosses').addEventListener('click',e=>{const btn=e.target.closest('[data-admin-edit-boss]');if(!btn)return;const boss=bosses.find(x=>x.id===btn.dataset.adminEditBoss);if(!boss)return;$('#adminDialog').close();openForm(boss)});
+function loadAdminSettings(){
+  $('#adminAtlasName').textContent=cfg.atlasName||'Elite Boss Atlas';
+  $('#adminDatabaseStatus').textContent=supabase?'Connected to Supabase':'Supabase is not configured';
+}
 setInterval(()=>{if($('#detailDialog').open&&selected)openDetail(selected.id)},30000);render();

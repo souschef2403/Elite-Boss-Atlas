@@ -180,3 +180,36 @@ function loadAdminSettings(){
   $('#adminDatabaseStatus').textContent=supabase?'Connected to Supabase':'Supabase is not configured';
 }
 setInterval(()=>{if($('#detailDialog').open&&selected)openDetail(selected.id)},30000);render();
+
+// Installable desktop/mobile app (PWA)
+let deferredInstallPrompt=null;
+const installButtons=['#installAppBtn','#installNavBtn','#installFooterBtn'].map(sel=>$(sel)).filter(Boolean);
+const isStandalone=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
+function updateInstallButtons(){
+  installButtons.forEach(btn=>{
+    if(isStandalone){btn.textContent='✓ App installed';btn.disabled=true;}
+    else if(deferredInstallPrompt){btn.textContent=btn.id==='installNavBtn'?'Download now':'⬇ Download now';btn.disabled=false;}
+  });
+}
+function showInstallHelp(){
+  const apple=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  const text=apple
+    ? 'On iPhone or iPad, tap Share in Safari, then choose “Add to Home Screen”.'
+    : 'Open your browser menu and choose “Install Elite Boss Atlas” or “Create shortcut”. In Chrome or Edge, the install icon may also appear at the right of the address bar.';
+  toast(text);
+  const hint=$('#installHint');if(hint)hint.textContent=text;
+}
+async function installAtlas(){
+  if(isStandalone)return toast('Elite Boss Atlas is already installed.');
+  if(!deferredInstallPrompt)return showInstallHelp();
+  deferredInstallPrompt.prompt();
+  const choice=await deferredInstallPrompt.userChoice;
+  deferredInstallPrompt=null;
+  if(choice.outcome==='accepted')toast('Elite Boss Atlas was installed. Look for the new desktop or home-screen icon.');
+  updateInstallButtons();
+}
+window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();deferredInstallPrompt=event;updateInstallButtons()});
+window.addEventListener('appinstalled',()=>{deferredInstallPrompt=null;installButtons.forEach(btn=>{btn.textContent='✓ App installed';btn.disabled=true});toast('Elite Boss Atlas is ready from your desktop or home screen.')});
+installButtons.forEach(btn=>btn.addEventListener('click',installAtlas));
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(err=>console.warn('Service worker registration failed',err)));
+updateInstallButtons();

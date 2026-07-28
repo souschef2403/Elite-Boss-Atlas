@@ -1,0 +1,3 @@
+No database migration is required for v2.3.
+This update uses the community_submissions, spawn_observations, reviewer_notes,
+and is_moderator fields already installed successfully by v2.2.
